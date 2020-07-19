@@ -1,0 +1,106 @@
+Sub Data_read()
+'読込行&列指定
+    Dim buf As Variant
+    Dim Fnames As Variant
+    Dim fn As Variant
+    Dim FNo As Integer
+    Dim TextLine As String
+    Dim SplitType As String
+    Dim Key As Variant
+    Dim KeyColumn As Integer
+    Dim TargetColumn As Variant
+    
+    Const RowMax As Long = 99
+    Const ColMax As Long = 29
+    flg = False
+    
+    ReDim Outline(RowMax, ColMax)
+    
+    Application.ScreenUpdating = False ' 描画を停止する
+    
+    Call GetKey(Key, KeyColumn, TargetColumn, SplitType)
+    
+    Fnames = Application.GetOpenFilename _
+        ("DataFile, *.csv;*.txt", 1, "ファイルインポート", , True)
+    If VarType(Fnames) = vbBoolean Then Exit Sub
+
+    For Each fn In Fnames
+    
+        FNo = FreeFile(0)
+        Open fn For Input As #FNo
+    
+        Do While Not EOF(FNo)
+            Line Input #FNo, TextLine
+            buf = Split(TextLine, SplitType)
+            '対象データを格納
+            If UBound(buf) > 0 Then
+                Call DataSet(Key, KeyColumn, TargetColumn, buf, Outline, ColMax)
+            End If
+        Loop
+    Close #FNo
+    Next fn
+    
+    Application.ScreenUpdating = True  ' 描画を再開する
+    
+    '2シート目を選択：【前提】2シート目にTEXTの内容を出力
+    Worksheets(2).Select
+    Range("A1").Resize(100, 30) = Outline
+    
+End Sub
+
+Public Function DataSet(ByVal Key As Variant, ByVal TargetColumn As Variant, ByVal buf As Variant, ByRef Outline As Variant, ByVal ColMax As Long)
+
+    Dim i As Long
+    Dim j As Long
+    Dim k As Long
+    Dim flg As Boolean
+    
+    '対象キーワードの値を配列に格納
+    For i = 1 To UBound(Key)
+        If buf(0) = Key(i, 1) Then
+            For j = 0 To UBound(Outline)
+                If Outline(j, 0) = "" Then
+                    If UBound(buf) >= TargetColumn - 1 Then
+                        Outline(j, 0) = Key(i, 1)
+                        Outline(j, 1) = "'" & buf(TargetColumn - 1)
+                        flg = True
+                    End If
+                    Exit For
+                End If
+                If Outline(j, 0) = Key(i, 1) Then
+                    For k = 1 To ColMax
+                       If Outline(j, k) = "" Then
+                            If UBound(buf) >= TargetColumn - 1 Then
+                                Outline(j, k) = "'" & buf(TargetColumn - 1)
+                                flg = True
+                            End If
+                            Exit For
+                        End If
+                    Next k
+                End If
+                If flg = True Then
+                    flg = False
+                    Exit For
+                End If
+            Next j
+            If flg = True Then
+                flg = False
+                Exit For
+            End If
+        End If
+    Next i
+
+End Function
+
+Public Function GetKey(ByRef SearchKey As Variant, ByRef column As Variant, ByRef SplitType)
+
+    '1シート目を選択：【前提】1シート目のA列に検索キーを書く
+    Worksheets(1).Select
+    'A列の検索キーを取得(A1は除く)
+    SearchKey = Range("A2", Cells(Rows.Count, 1).End(xlUp)).Value
+    'B列の対象データ列を取得(B1は除く)
+    column = Range("B2", Cells(Rows.Count, 2).End(xlUp)).Value
+    'C2の対象データを取得
+    SplitType = Cells(2, 3).Value
+
+End Function
